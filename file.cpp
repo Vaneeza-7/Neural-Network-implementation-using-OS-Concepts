@@ -8,7 +8,7 @@
 #include<pthread.h>
 #include<fstream>
 #include<cmath>
-#define NUM_I 2
+#define NUM_I 3
 #define NUM_H 8
 #define NUM_O 1
 
@@ -19,7 +19,7 @@ using namespace std;
    
    pid_t pid;
    double output;
-   
+   pthread_t p1,p2,p3,p4,p5,p6,p7,p8;
    
 struct input
 {
@@ -52,10 +52,15 @@ void* n1(void* smth)
 
 }
 
+void* n2(void* smth)
+{
+  cout<<"Thread from hidden layer"<<endl;
+
+}
 
 int main()
 {
-   int layers;
+   int layers, num_neurons;
   //making layers dynamically
   cout<<"---The Neural Network---"<<endl;
   cout<<"How many hidden layers do you want in your network?"<<endl;
@@ -63,9 +68,9 @@ int main()
   layers+=2;
   
   input* data;
-  data->values[0]=0.1;
-  data->values[1]=0.2;
-  
+//  data->values[0]=0.1;
+//  data->values[1]=0.2;
+//  
   //input layer is main itself
   
 //       for(int i=0;i<NUM_T;i++)
@@ -164,27 +169,37 @@ int main()
         else
            {
            
-               pthread_t neuron[NUM_H];
-        
-              for(int j=0; j<NUM_H; j++)
-              {
-       
-              pthread_create(&neuron[j], NULL, n1, (void*) data);
-              cout<<"thread created "<<j+1<<endl;
-              }
-       
+           pthread_create(&p1, NULL, n2, (void*) data);
+           pthread_create(&p2, NULL, n2, (void*) data);
+           pthread_create(&p3, NULL, n2, (void*) data);
+           pthread_create(&p4, NULL, n2, (void*) data);
+           pthread_create(&p5, NULL, n2, (void*) data);
+           pthread_create(&p6, NULL, n2, (void*) data);
+           pthread_create(&p7, NULL, n2, (void*) data);
+           pthread_create(&p8, NULL, n2, (void*) data);
+//           
+//               pthread_t neuron[NUM_H];
+//        
+//              for(int j=0; j<NUM_H; j++)
+//              {
+//       
+//              pthread_create(&neuron[j], NULL, n1, (void*) data);
+//              cout<<"thread created "<<j+1<<endl;
+//              }
+//       
 
-              for(int j=0;j<NUM_H;j++)
-              {
-          
-               //thread will write to pipe
-               pthread_join(neuron[j],NULL);
-               cout<<"Thread"<<j<<" joined\n";
-              }
-           
+//              for(int j=0;j<NUM_H;j++)
+//              {
+//          
+//               //thread will write to pipe
+//               pthread_join(neuron[j],NULL);
+//               cout<<"Thread"<<j<<" joined\n";
+//              }
+//           
          
             }//end of else 
-       
+            
+                  
             pthread_exit(0);
             exit(0); 
            
