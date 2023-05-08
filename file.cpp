@@ -9,12 +9,26 @@
 #include<fstream>
 #include<cmath>
 #define NUM_V 2
-#define ws 8
+#define ws 8 //neurons for hidden layer
 
 using namespace std;
 //global variables
-   	double weights1[ws]={0.1, -0.2, 0.3, 0.1, -0.2, 0.3, 0.1, -0.2};
-   	double weights2[ws]={-0.4, 0.5, 0.6, -0.4, 0.5, 0.6, -0.4, 0.5};
+   	double weights[100][100]={{0.1, -0.2, 0.3, 0.1, -0.2, 0.3, 0.1, -0.2},
+				{-0.4, 0.5, 0.6, -0.4, 0.5, 0.6, -0.4, 0.5}};
+        double value[100]={0.1, 0.2}; //values atm 2
+	
+	int pipes[100][2];
+	
+//	 int** pipes = new int*[n];
+//              for(int i=0; i<n; i++) {
+//                     pipes[i] = new int[2];
+//                      if(pipe(pipes[i]) < 0) {
+//                             cout << "Failed to create pipe" << std::endl;
+//                              exit(1);
+//                                          }
+//	}
+	
+	
 	int subs;
    	pthread_mutex_t mutex1;
    	pid_t pid;
@@ -26,36 +40,34 @@ using namespace std;
 void* n1(void* smth)
 {
   	pthread_mutex_lock(&mutex1);
-   	double* a = (double*)smth;
-   	if(subs==1)
+   	int* a = (int*)smth;
+	for(int i=0; i < ws; i++)
    	{
-   		for(int i=0; i<ws; i++)
-   		{
-	   		double w1 = weights1[i];
-	   		double z1 = *a*w1;
-	   		cout<<"In 1st if Value of a is "<<*a<<endl;
-	   		cout<<"The first value written to pipe is"<<z1<<endl;
-    		}
-   	}
-   	
-   	else if(subs==2)
-   	{
-   		for(int i=0; i<ws; i++)
-   		{
-   			double w2 = weights2[i];
-   			double z2=*a*w2;  
-                         cout<<"In 2nd if Value of a is "<<*a<<endl;
-   			cout<<"The second value written to pipe is "<<z2<<endl;
-   		}
-  	}
-   	//write to pipe
+   	      
+   		//cout << "Weights: " << weights[*a][i] << endl;
+	   	double w1 = weights[*a][i];
+	   	double z1 = value[*a]*w1;
+	   	//cout<<"The values are " << z1 << endl;
+	   	
+	   	
+	   	 int pipe_fd = pipes[i][1];
+	   	 close(pipes[i][0]);
+                  if (write(pipe_fd, &z1, sizeof(z1)) == -1) {
+                          perror("write");
+                     }
+                    
+                    close(pipes[i][1]);
+                   
+                   double buffer;
+                  read(pipes[i][0], &buffer, sizeof(buffer));
+                  cout << "Value read from pipe " << i << ": " << buffer <<endl;
+                  close(pipes[i][0]);
+                    
+    	}
+    	delete a;
+    	
    
-	//int fd[2];
-	//pipe(fd);
-	//close(fd[0]);
-	//write(fd[1], &z1, sizeof(double));
-	//write(fd[1], &z2, sizeof(double));
-	//close(fd[1]);
+    	
    	pthread_mutex_unlock(&mutex1);
    	pthread_exit(NULL);
 }
@@ -90,6 +102,14 @@ int main()
   	layers+=2;
   
   	count=0;
+  	
+  	for (int i = 0; i < 100; i++) {
+        if (pipe(pipes[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+        } 
+  	
      
   	pid_t* pid = new pid_t[layers];
   
@@ -104,7 +124,7 @@ int main()
 		    	//cout<<"Process id"<<id<<endl;
 		    	//parent wait for child processes to end
 		    	int status;
-		    	wait(&status);
+		    	wait(&status);  //a wait loop??
 		}
            
         	//child process runs following
@@ -120,13 +140,11 @@ int main()
       
            			pthread_t* neuronI= new pthread_t[NUM_I];
         
-         			for(subs=0; subs<NUM_I; subs++)
+                                 for(int j=0;j<NUM_I;j++)
          			{
-       
-		  			pthread_create(&neuronI[subs], NULL, n1, (void*) &data[subs]);
-		  			cout<<"thread created "<<subs+1<<endl;
+		  			pthread_create(&neuronI[j], NULL, n1, (void*) new int(j));
+		  			cout<<"thread created "<<j+1<<endl;
          			}
-       
 
 				for(int j=0;j<NUM_I;j++)
 				{
