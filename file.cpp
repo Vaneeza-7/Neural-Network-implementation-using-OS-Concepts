@@ -139,12 +139,21 @@ int main()
          		{      
       
            			pthread_t* neuronI= new pthread_t[NUM_I];
+           			
+           			int fd[2];
+           			pipe(fd);
+           			char buffer[200];
+           			
+           			
         
                                  for(int j=0;j<NUM_I;j++)
          			{
 		  			pthread_create(&neuronI[j], NULL, n1, (void*) new int(j));
 		  			cout<<"thread created "<<j+1<<endl;
          			}
+         			
+         			
+         			//write array to pipe
 
 				for(int j=0;j<NUM_I;j++)
 				{
@@ -156,7 +165,7 @@ int main()
 			}
 		         else if(i==layers-1)//input layer
          		{      
-      
+                                
            			pthread_t* neuronO= new pthread_t[NUM_O];
         
          			for(subs=0; subs<NUM_O; subs++)
@@ -177,6 +186,7 @@ int main()
 			}	
 			else if(i>0 && i<layers-1)
         		{
+        		        //read
 				pthread_t* neuronH= new pthread_t[NUM_H];
 			    
 			      	for(int j=0; j<NUM_H; j++)
