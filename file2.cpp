@@ -61,35 +61,53 @@ struct outputLayer
 	double** oWeights;
 };
    	
-   	
+struct threadArg
+{
+   int subscript;
+   int write_end;
+
+};   	
    	
 //global variables
 
 inputLayer iLayer;   
 hiddenLayer* hLayer;
 outputLayer oLayer;
-		
-double** mulArrayIn; //the ouput result array with multiplied values
 	
 
 //thread functions
 void* n1(void* smth)
 {
   	pthread_mutex_lock(&mutex1);
-   	int* a = (int*)smth;  //a is subscript of thread ; thread number/neuron number
+   	threadArg* arg = (threadArg*)smth;  //a is subscript of thread ; thread number/neuron number
+   	
+   	int a = arg->subscript;
+ 
+   	double* oneD = new double[inWNum];
    	
 	for(int i=0; i < inWNum; i++)
    	{
    	      
    		//cout << "Weights: " << weights[*a][i] << endl;
-	   	double w1 = iLayer.iWeights[*a][i];
-	   	double z1 = iLayer.values[*a] * w1;
+	   	double w1 = iLayer.iWeights[a][i];
+	   	double z1 = iLayer.values[a] * w1;
 	   	cout<<"The values are " << z1 << endl;
 	   	
-	   	mulArrayIn[*a][i]=z1; //value multiplied and put into specific row of array
+	   	oneD[i]=z1;  //value multiplied and put into specific array
                   
     	}
-    	delete a;
+    
+    	 //open(arg->write_end);
+         open(to_string(arg->write_end).c_str(), O_RDONLY);
+    
+    	//write one d array to pipe
+    	if (write(arg->write_end, oneD, inWNum * sizeof(double)) == -1) 
+    	{
+                 perror("write");
+                 exit(EXIT_FAILURE);
+    	}
+    	
+    	close(arg->write_end);
     	
    	pthread_mutex_unlock(&mutex1);
    	pthread_exit(NULL);
@@ -272,10 +290,10 @@ int main()
 		
 		
 		//mulArrayInput
-		mulArrayIn = new double* [inNeuronNum];
+		double** mulArrayIn = new double* [inNeuronNum];
 		for(int i=0; i<inNeuronNum; i++)
 		{
-		     mulArrayIn[i]=new double [inWNum];
+		     mulArrayIn[i]=new double [inWNum]{0.0};
 		}
 		
 	//-------------------------------------- Reading from the file for storing weights and values of neurons -----------------------------------------------//
@@ -517,28 +535,46 @@ int main()
                                      perror("pipe");
                                      exit(EXIT_FAILURE);
                                      }
-           			double buffer[200];
+           			double buffer[inWNum];
            			
            			
            			
                                  for(int j=0;j<inNeuronNum;j++)
          			{
-		  			pthread_create(&neuronI[j], NULL, n1, (void*) new int(j)); //thread subscript
+         			        threadArg arg={j, fd[1]};
+		  			pthread_create(&neuronI[j], NULL, n1, (void*) &arg); //thread subscript
+		  			
+		  			//open(fd[0]);
+		  			open(to_string(fd[0]).c_str(), O_RDONLY);
+    
+		  			//read array from pipe to buffer			
+		  			 if (read(fd[0], buffer, inWNum * sizeof(double)) == -1) 
+		  			 {
+                                                perror("read");
+                                                exit(EXIT_FAILURE);
+                                           }
+                                          
+                                          close(fd[0]);
+                                          
+                                         for(int z=0; z<inWNum; z++)
+                                         {
+                                                cout<<buffer[z]<<" ";
+                                              mulArrayIn[j][z]=buffer[z];
+                                         
+                                         }
+                                         
 		  			cout<<"thread created "<<j+1<<endl;
-         			}
-         			
-         			
-         			//write array to pipe
-
+         			 }
+         		
 				for(int j=0;j<inNeuronNum;j++)
-				{
-				  
-					//thread will write to pipe
+			        {
 					pthread_join(neuronI[j],NULL);
 					cout<<"Thread"<<j<<" joined\n";
 				} 
-			}
-		         else if(i==totalLayers-1)//input layer
+				
+			}//end of 1st layer/process
+			
+		         else if(i==totalLayers-1) //output layer
          		{      
                                 
            			pthread_t* neuronO= new pthread_t[oNeuronNum];
