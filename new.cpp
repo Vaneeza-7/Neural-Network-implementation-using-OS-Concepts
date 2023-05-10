@@ -134,12 +134,7 @@ void* n1(void* smth)
 void* n2(void* smth)
 {
   cout<<"Thread from hidden layer"<<endl;
-  
-  
-  
-  
-  
-  
+
   
   pthread_exit(NULL);
 }
@@ -604,29 +599,7 @@ outputLayer oLayer;
 				} 
 				//close(fd[1]);
                                           
-				 //read array from pipe to buffer
 				 
-				 double buffer[inNeuronNum][inWNum];
-				 			
-		  			 if (read(fd[0], buffer, inWNum * inNeuronNum* sizeof(double)) == -1) 
-		  			 {
-                                                perror("read");
-                                                exit(EXIT_FAILURE);
-                                           }
-                                          close(fd[0]);
-                                          close(fd[1]);
-                                          
-                                 for(int j=0;j<inNeuronNum; j++)
-         			{
-         			        //cout<<"Buffer "<<buffer[j]<<" ";
-         			   for(int z=0; z<inWNum; z++)
-         			   { 
-         			        
-                                         cout<<"Buffer "<<buffer[j][z]<<endl;
-         			   }
-         			        cout<<endl;
-         			}         
-         			 
 				
 			}//end of 1st layer/process
 			
@@ -675,7 +648,30 @@ outputLayer oLayer;
 //                                         }
 //        		        }
 //        		        
-        		        
+        		        		 //read array from pipe to buffer
+		      if(i==1)
+		             { 
+			       double buffer[inNeuronNum][inWNum];
+			 			
+	  			 if (read(fd[0], buffer, inWNum * inNeuronNum* sizeof(double)) == -1) 
+	  			 {
+                                        perror("read");
+                                        exit(EXIT_FAILURE);
+                                   }
+                                  close(fd[0]);
+                                  close(fd[1]);
+                                  
+                                 for(int j=0;j<inNeuronNum; j++)
+         			{
+         			        //cout<<"Buffer "<<buffer[j]<<" ";
+         			   for(int z=0; z<inWNum; z++)
+         			   { 
+         			        
+                                         cout<<"Buffer "<<buffer[j][z]<<endl;
+         			   }
+         			        cout<<endl;
+         			}         
+         	               }
 				pthread_t* neuronH= new pthread_t[hNeuronNum];
 			    
 			      	for(int j=0; j<hNeuronNum; j++)
