@@ -68,7 +68,14 @@ struct threadArg
    int write_end;
    double** mulArrayIn;
 
-};   	
+}; 
+
+struct hidArg
+{
+	double** arr;//array which is read buffer
+	double** hw; //weights
+};
+  	
    	
 //global variables
 
@@ -77,6 +84,7 @@ struct threadArg
 //outputLayer oLayer;
 	
 int global_write=0;
+int global_read=0;
 int counter=0;
 
 //thread functions
@@ -106,7 +114,7 @@ void* n1(void* smth)
 	
 	}
 	
-//	converting to 2d array to 1d
+//	converting  2d array to 1d
     	for(int i=0; i<inNeuronNum; i++)
     	{
     	   for(int j=0; j<inWNum; j++)
@@ -133,10 +141,89 @@ void* n1(void* smth)
 
 void* n2(void* smth)
 {
+   pthread_mutex_lock(&mutex1);
   cout<<"Thread from hidden layer"<<endl;
-
   
+        hidArg* h = (hidArg*) smth;
+	
+	//huid arg has hlayer object called hw and 2d array
+	
+	double* added=new double[inWNum];
+	
+	for(int j=0;j<inNeuronNum;j++)
+	{
+	   for(int z=0; z<inWNum; z++)
+            {
+                    added[z] += h->arr[j][z];
+                    cout<<"Added "<<added[z]<<endl;
+                    //cout<<"Hidden array "<<h->hw[j][z]<<endl;
+            
+//		global_var+= h->arr[j]*weights[j][hcounter];
+	    }
+	    cout<<endl;
+	}
+	
+	//multiplied values of input have been added in added array
+         //now we have to multiply added array with weights of hidden layer 1
+         //added array size: inWNum,,, weightsHiddenLayer1 size: hNeuronNum* hWNum
+         
+         double** res=new double*[hNeuronNum];
+         for(int i=0; i<hNeuronNum; i++)
+         {
+              res[i]=new double[hWNum]{0.0};
+         
+         }
+         
+         
+         //result should be 8*8
+         for(int i=0; i<hNeuronNum; i++)
+         {
+            for(int j=0; j<hWNum; j++)
+            {
+                 res[i][j]=added[i]*h->hw[i][j];
+                  //cout<<res[i][j]<<" ";
+            }
+          //  cout<<endl;
+         
+         }
+         
+         double* oneDplaceholder=new double[hWNum*hNeuronNum];
+
+         	
+//	converting  2d array to 1d
+    	for(int i=0; i<hNeuronNum; i++)
+    	{
+    	   for(int j=0; j<hWNum; j++)
+    	   {
+    	      oneDplaceholder[i*hWNum+j]=res[i][j];    	   
+    	   }
+    	
+    	}
+         
+         
+          //only 1 thread will write to pipe
+           if(counter==0)
+           {
+    	   if (write(global_write, oneDplaceholder, hWNum * hNeuronNum* sizeof(double)) == -1) 
+    	   {
+                 perror("write");
+                 exit(EXIT_FAILURE);
+    	   }
+            counter++;
+            
+           }
+           
+           
+
+  pthread_mutex_unlock(&mutex1);
   pthread_exit(NULL);
+}
+
+void* n3(void* arg)
+{
+  cout<<"In the else of hidden\n";
+  pthread_exit(NULL);
+
 }
 
 int main()
@@ -277,7 +364,7 @@ outputLayer oLayer;
 		}
 		
 		hNeuronNum/=hLayerNum;
-		//hiddenLayer*
+		//hiddenLayer object array*
 		 hLayer = new hiddenLayer[hLayerNum];
 		for (int i = 0; i < hLayerNum;i++)
 		{
@@ -287,6 +374,8 @@ outputLayer oLayer;
 				hLayer[i].hWeights[j] = new double[hWNum]{ 0.0 };
 			}
 		}
+		
+		
 		
 		//outputLayer oLayer;
 		oLayer.oWeights = new double*[oNeuronNum];
@@ -312,6 +401,21 @@ outputLayer oLayer;
 		{
 		     mulArrayRead[i]=new double [inWNum]{0.0};
 		}
+		
+		hidArg hObject;  //making object for hidden neuron
+		
+		hObject.arr = new double* [inNeuronNum];
+		for(int i=0; i<inNeuronNum; i++)
+		{
+		     hObject.arr[i]=new double [inWNum]{0.0};
+		}
+		
+		hObject.hw = new double* [hNeuronNum];
+		for(int i=0; i<hNeuronNum; i++)
+		{
+		     hObject.hw[i]=new double [hWNum]{0.0};
+		}
+		
 	//-------------------------------------- Reading from the file for storing weights and values of neurons -----------------------------------------------//
 	file.open(fileName.c_str(), ios :: in);						//Opening the file---------------------
 	
@@ -508,6 +612,23 @@ outputLayer oLayer;
 	//making layers dynamically
   	count=0;
   	
+//  	for(int i=0; i<hLayerNum; i++)
+//		{
+//		  for(int j=0; j<hNeuronNum; j++)
+//		  {
+//		      for(int z=0; z<hWNum; z++)
+//		      {
+//		      
+//		        cout<<hLayer[i].hWeights[j][z]<<" ";
+//		      
+//		      }
+//		    cout<<endl;
+//		  }
+//		cout<<endl;
+//		cout<<endl;
+//		}
+  	
+  	
   	double* data = new double [inNeuronNum];
   	for(int i=0; i<inNeuronNum; i++)
   	{
@@ -526,6 +647,7 @@ outputLayer oLayer;
                                      }
                                      
                                      global_write=fd[1];
+                                     global_read=fd[0];
   
   //====================================================PROCESSES=====//
 	for (int i=0; i < totalLayers; i++)
@@ -539,6 +661,7 @@ outputLayer oLayer;
 		    	//parent wait for child processes to end
 		    	int status;
 		    	wait(&status);  //a wait loop??
+		    	
 		}
            
         	//child process runs following
@@ -649,35 +772,70 @@ outputLayer oLayer;
 //        		        }
 //        		        
         		        		 //read array from pipe to buffer
-		      if(i==1)
+		      if(i==1) //if first hidden layer
 		             { 
-			       double buffer[inNeuronNum][inWNum];
-			 			
+			         double buffer[inNeuronNum][inWNum];
+			 		//the hidden layer is reading the input layer output	
 	  			 if (read(fd[0], buffer, inWNum * inNeuronNum* sizeof(double)) == -1) 
 	  			 {
                                         perror("read");
                                         exit(EXIT_FAILURE);
                                    }
-                                  close(fd[0]);
-                                  close(fd[1]);
+                                  //close(fd[0]);
+                                  //close(fd[1]);
                                   
+                                  //printing the output of input layer i.e. buffer
                                  for(int j=0;j<inNeuronNum; j++)
          			{
-         			        //cout<<"Buffer "<<buffer[j]<<" ";
+         			      
          			   for(int z=0; z<inWNum; z++)
          			   { 
          			        
                                          cout<<"Buffer "<<buffer[j][z]<<endl;
          			   }
          			        cout<<endl;
-         			}         
-         	               }
-				pthread_t* neuronH= new pthread_t[hNeuronNum];
-			    
-			      	for(int j=0; j<hNeuronNum; j++)
+         			}      
+         		        //cout<<"Thread will be created soon \n";	
+         			//creating hidden neurons i.e. 08
+				
+				
+				
+				for(int j=0; j<inNeuronNum; j++)
+				{
+				  for(int z=0; z<inWNum; z++)
+				  {
+				     
+				       hObject.arr[j][z]=buffer[j][z];
+				  }
+				}
+				
+				
+				cout<<"Value of HNeuronNUm before loop"<<hNeuronNum<<endl;
+				
+				for(int j=0; j<hNeuronNum; j++)
+				{
+				  for(int z=0; z<hWNum; z++)
+				  {
+				     hObject.hw[j][z]=hLayer[0].hWeights[j][z];
+				     cout<<hObject.hw[j][z]<<" ";
+				     //cout<<hLayer[0].hWeights[j][z]<<" ";
+			          }
+			          cout<<endl;
+				}
+				
+				//hlayer is array of hiddenLayer objects
+				//its size is hLayerNum
+				
+				
+				cout<<"Value of HNeuronNUm "<<hNeuronNum<<endl;
+				
+				
+				pthread_t* neuronH1= new pthread_t[hNeuronNum];
+				
+				for(int j=0; j<hNeuronNum; j++)
 			      	{
-			      		pthread_create(&neuronH[j], NULL, n2, (void*) data);
-			      		//cout<<"thread created "<<j+1<<endl;
+			      		pthread_create(&neuronH1[j], NULL, n2, (void*) &hObject);
+			      		cout<<"HIdden layer1 thread created "<<j+1<<endl;
               			}
      
 
@@ -685,9 +843,69 @@ outputLayer oLayer;
 			      	{
 			  
 				       //thread will write to pipe
+				       pthread_join(neuronH1[j],NULL);
+				       cout<<"Thread"<<j<<" joined\n";
+			      	}
+				
+				
+         			   
+         	               }
+         	           else
+         	             {
+         	                  
+         	                  cout<<"Hi im process "<<i<<endl;
+         	                  double buffer2[hNeuronNum][hWNum];
+			 		//the hidden layer is reading the hidden layer output	
+	  			  if (read(fd[0], buffer2, hWNum * hNeuronNum* sizeof(double)) == -1) 
+	  			  {
+                                        perror("read");
+                                        exit(EXIT_FAILURE);
+                                   }
+                                   
+                                   //close(fd[0]);
+                                   //close(fd[1]);
+                                  
+                                   
+                                     //printing the output of hidden layer i.e. buffer
+                                 for(int j=0;j<hNeuronNum; j++)
+         			{
+         			      
+         			   for(int z=0; z<hWNum; z++)
+         			   { 
+         			        
+                                         cout<<"Buffer 2 :"<<buffer2[j][z]<<endl;
+         			   }
+         			        cout<<endl;
+         			}
+                                   
+      			
+    			         //creating hidden neurons i.e. 08
+				pthread_t* neuronH= new pthread_t[hNeuronNum];
+				
+			      	for(int j=0; j<hNeuronNum; j++)
+			      	{
+			      	
+			      		pthread_create(&neuronH[j], NULL, n3, (void*) &hObject);	
+			      		cout<<"Thread created\n";
+//			      		close(fd[0]); 
+//					write(fd[1], global_var.c_str(), global_var.length());
+//					close(fd[1]);
+//					
+//					read(fd[0], &array[j], sizeof(double));
+//					close(fd[0]);
+	      			}
+	      			
+			      	for(int j=0;j<hNeuronNum;j++)
+			      	{
+			  
+				       //thread will write to pipe
 				       pthread_join(neuronH[j],NULL);
 				       cout<<"Thread"<<j<<" joined\n";
 			      	}
+		      	}    
+         	                
+			    
+			      	
          
          		}//end of else 
 			pthread_exit(0);
