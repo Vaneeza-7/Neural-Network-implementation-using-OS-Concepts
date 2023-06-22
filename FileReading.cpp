@@ -1,3 +1,6 @@
+//---this file is not being actively used in the main program, but it contains a seperate implementation of file reading for reference.---//
+
+
 #include <iostream>
 #include <string>
 #include <fstream>
